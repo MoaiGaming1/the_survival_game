@@ -4,12 +4,14 @@
 #include "noise/FastNoiseLite.h"
 
 #include "constants.hpp"
+#include "physicsImplementation.hpp"
 #include "object.hpp"
 
 namespace mapGen {
 	struct Map {
 		std::vector<float> heightmap;
 		object::Object3D* terrain;
+		JPH::BodyID terrainBodyID;
 		std::vector<object::Object3D*> trees;
 	};
 
@@ -121,15 +123,40 @@ namespace mapGen {
 						// spawn tree
 						object::Object3D* tree = new object::Object3D(shaderProg, camera);
 						tree->setModel("assets/models/Tree.json");
-						tree->position = {x, heightmap[glm::floor(z/TERRAIN_GRID_SIZE)*TERRAIN_GRID_COUNT + glm::floor(x/TERRAIN_GRID_SIZE)], z};
+						tree->position = {x, heightmap[glm::floor(z/TERRAIN_GRID_SIZE)*TERRAIN_GRID_COUNT + glm::floor(x/TERRAIN_GRID_SIZE)]-1, z};
 						trees.push_back(tree);
-						//tree->addPhysics(object::Box, JPH::EMotionType::Static, {3.5f, 30.0f, 3.5f}); // TODO: make collision better, add a cylinder shape
+						tree->addPhysics(object::Box, JPH::EMotionType::Static, {3.5f, 30.0f, 3.5f}); // TODO: add cylinder shape and change tree physics shape to cylinder
 					}
 				}
 			}
 		}
 
 		Map* map = new Map();
+
+		// terrain collision body setup
+		{
+			JPH::HeightFieldShapeSettings hfSettings(
+				heightmap.data(),
+				JPH::Vec3(0.0f, 0.0f, 0.0f),
+				JPH::Vec3(TERRAIN_GRID_SIZE, 1.0f, TERRAIN_GRID_SIZE),
+				TERRAIN_GRID_COUNT
+			);
+
+			JPH::ShapeRefC hfShape = hfSettings.Create().Get();
+
+			JPH::BodyCreationSettings bSettings(
+				hfShape,
+				JPH::RVec3(0.0f, 0.0f, 0.0f),
+				JPH::Quat::sIdentity(),
+				JPH::EMotionType::Static,
+				physics::Layers::NON_MOVING
+			);
+
+			JPH::Body* b = physics::physicsSystem.GetBodyInterface().CreateBody(bSettings);
+			physics::physicsSystem.GetBodyInterface().AddBody(b->GetID(), JPH::EActivation::DontActivate);
+
+			map->terrainBodyID = b->GetID();
+		}
 		
 		map->heightmap = heightmap;
 		map->terrain = terrain;

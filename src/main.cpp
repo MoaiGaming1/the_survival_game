@@ -167,24 +167,11 @@ int main() {
 
 	object::Object3D* character = new object::Object3D(shaderProg3D, camera);
 	character->setModel("assets/models/Cube.json");
+	character->position = {TERRAIN_GRID_COUNT*TERRAIN_GRID_SIZE/2, TERRAIN_HEIGHT_SCALE+TERRAIN_MOUNTAIN_HEIGHT_SCALE, TERRAIN_GRID_COUNT*TERRAIN_GRID_SIZE/2};
 	character->addPhysics(object::ObjectHitboxType::Box, JPH::EMotionType::Dynamic);
 	character->objColor = {0.7f, 0.8f, 0.9f, 1.0f};
 	character->visible = false;
 	objects3D.push_back(character);
-
-	object::Object3D* suzanne = new object::Object3D(shaderProg3D, camera);
-	suzanne->setModel("assets/models/Suzanne.json");
-	suzanne->addPhysics(object::ObjectHitboxType::Box, JPH::EMotionType::Dynamic);
-	suzanne->objColor = {1.0f, 0.5f, 0.25f, 1.0f};
-	objects3D.push_back(suzanne);
-
-  object::Object3D* floorObj = new object::Object3D(shaderProg3D, camera);
-	floorObj->setModel("assets/models/Cube.json");
-  floorObj->scale = glm::vec3(20.0f, 0.5f, 20.0f);
-  floorObj->position = glm::vec3(0.0f, -10.0f, 0.0f);
-	floorObj->objColor = {0.8f, 0.8f, 0.8f, 1.0f};
-	floorObj->addPhysics(object::ObjectHitboxType::Box, JPH::EMotionType::Static, {20.0f, 0.5f, 20.0f});
-  objects3D.push_back(floorObj);
 
 	std::cout << "starting the render loop\n";
 
