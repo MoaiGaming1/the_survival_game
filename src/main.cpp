@@ -25,6 +25,14 @@ std::vector<object::PointLight*> pointLights;
 object::Camera* camera;
 input::InputHandler* inputHandler;
 
+namespace PlayerToolStates {
+	enum PlayerToolState {
+		Weld,
+		Break,
+		Place
+	};
+};
+
 void framebufferSizeCallback(GLFWwindow* win, int x, int y) {
 	glViewport(0, 0, x, y);
 }
@@ -168,7 +176,7 @@ int main() {
 	object::Object3D* character = new object::Object3D(shaderProg3D, camera);
 	character->setModel("assets/models/Cube.json");
 	character->position = {TERRAIN_GRID_COUNT*TERRAIN_GRID_SIZE/2, TERRAIN_HEIGHT_SCALE+TERRAIN_MOUNTAIN_HEIGHT_SCALE, TERRAIN_GRID_COUNT*TERRAIN_GRID_SIZE/2};
-	character->addPhysics(object::ObjectHitboxType::Box, JPH::EMotionType::Dynamic);
+	character->addPhysics(object::ObjectHitboxTypes::Box, JPH::EMotionType::Dynamic);
 	character->objColor = {0.7f, 0.8f, 0.9f, 1.0f};
 	character->visible = false;
 	objects3D.push_back(character);
@@ -206,7 +214,7 @@ int main() {
 				character->removePhysics();
 			} else {
 				//std::cout << "stopped fly\n";
-				character->addPhysics(object::ObjectHitboxType::Box, JPH::EMotionType::Dynamic);
+				character->addPhysics(object::ObjectHitboxTypes::Box, JPH::EMotionType::Dynamic);
 			}
 		}
 	});

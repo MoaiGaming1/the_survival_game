@@ -13,8 +13,10 @@
 #include <vector>
 
 namespace object {
-	enum ObjectHitboxType {
-		Box = 1
+	namespace ObjectHitboxTypes {
+		enum ObjectHitboxType {
+			Box = 1
+		};
 	};
 
 	class PointLight {
@@ -232,12 +234,12 @@ namespace object {
 			updateVAOVBOEBO();
 		}
 
-		void addPhysics(enum ObjectHitboxType hitboxType = ObjectHitboxType::Box, enum JPH::EMotionType motionType = JPH::EMotionType::Dynamic, JPH::Vec3 hitboxSize = JPH::Vec3(1.0f, 1.0f, 1.0f)) {
+		void addPhysics(enum ObjectHitboxTypes::ObjectHitboxType hitboxType = ObjectHitboxTypes::Box, enum JPH::EMotionType motionType = JPH::EMotionType::Dynamic, JPH::Vec3 hitboxSize = JPH::Vec3(1.0f, 1.0f, 1.0f)) {
 			if (hasBody) return;
 			JPH::ShapeRefC shape;
 			
 			switch (hitboxType) {
-				case (ObjectHitboxType::Box):
+				case (ObjectHitboxTypes::Box):
 					JPH::ShapeSettings* boxShapeSettings = new JPH::BoxShapeSettings(hitboxSize);
 					shape = boxShapeSettings->Create().Get();
 			}
