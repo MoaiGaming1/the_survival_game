@@ -13,6 +13,19 @@
 #include <vector>
 
 namespace object {
+	namespace MaterialTypes {
+		enum MaterialType {
+			Wood,
+			Stone,
+			Iron,
+			Gold,
+			Copper,
+			Uranium,
+			Coal,
+			MATERIAL_TYPE_COUNT
+		};
+	};
+
 	namespace ObjectHitboxTypes {
 		enum ObjectHitboxType {
 			Box = 1
@@ -105,6 +118,12 @@ namespace object {
 			objColorLoc = glGetUniformLocation(shaderProgram, "objColor");
 		}
 
+		virtual ~Object() {
+			glDeleteVertexArrays(1, &VAO);
+			glDeleteBuffers(1, &VBO);
+			glDeleteBuffers(1, &EBO);
+		}
+
 		virtual void draw() {}
 	};
 
@@ -181,6 +200,12 @@ namespace object {
 
 		float deformResistance = 1;
 
+		bool hasMaterial = false;
+		enum MaterialTypes::MaterialType materialType;
+		float materialAmount = 1.0f;
+
+		bool canBeBroken = true;
+
 		void syncPhysics() {
 			if (!hasBody) return;
 
@@ -225,6 +250,10 @@ namespace object {
 			modelLoc = glGetUniformLocation(shaderProgram, "model");
 			normalMatLoc = glGetUniformLocation(shaderProgram, "normalMatrix");
 			dimensions = 3;
+		}
+
+		~Object3D() {
+			if (hasBody) removePhysics();
 		}
 
 		void setModel(const char* modelJsonFile) {

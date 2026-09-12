@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <unordered_map>
 
 #include "glad.h"
 #include "glfw3.h"
@@ -24,6 +25,8 @@ std::vector<object::Object3D*> objects3D;
 std::vector<object::PointLight*> pointLights;
 object::Camera* camera;
 input::InputHandler* inputHandler;
+std::unordered_map<object::MaterialTypes::MaterialType, float> materialInventory;
+JPH::IgnoreMultipleBodiesFilter playerToolRayFilter;
 
 namespace PlayerToolStates {
 	enum PlayerToolState {
@@ -36,6 +39,17 @@ namespace PlayerToolStates {
 object::Object3D* weldFirstObject = nullptr;
 
 enum PlayerToolStates::PlayerToolState playerCurrentTool;
+
+void destroyObject(object::Object3D* obj) {
+	auto it = std::find(objects3D.begin(), objects3D.end(), obj);
+	if (it != objects3D.end()) {
+		objects3D.erase(it);
+	}
+
+	if (weldFirstObject == obj) weldFirstObject = nullptr;
+
+	delete obj;
+}
 
 void framebufferSizeCallback(GLFWwindow* win, int x, int y) {
 	glViewport(0, 0, x, y);
@@ -186,8 +200,6 @@ int main() {
 
 	physics::init();
 
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
 	object::Object3D* character = new object::Object3D(shaderProg3D, camera);
 	character->setModel("assets/models/Cube.json");
 	character->position = {TERRAIN_GRID_COUNT*TERRAIN_GRID_SIZE/2, TERRAIN_HEIGHT_SCALE+TERRAIN_MOUNTAIN_HEIGHT_SCALE, TERRAIN_GRID_COUNT*TERRAIN_GRID_SIZE/2};
@@ -218,6 +230,10 @@ int main() {
 		objects3D.push_back(tree);
 	}
 
+	// set inventory to 0 as default
+	for (int i = 0; i < object::MaterialTypes::MATERIAL_TYPE_COUNT; i++) {
+		materialInventory[(object::MaterialTypes::MaterialType)i] = 0.0f;
+	}
 
 	std::cout << "starting the render loop\n";
 
@@ -290,13 +306,9 @@ int main() {
 	// weld tool usage
 	inputHandler->onMouseButtonStartPress.addListener([&](int k) -> void {
 		if (k == GLFW_MOUSE_BUTTON_LEFT && playerCurrentTool == PlayerToolStates::Weld) {
-			JPH::IgnoreMultipleBodiesFilter rayFilter;
-			rayFilter.Reserve(2);
-			rayFilter.IgnoreBody(character->bodyID);
-			rayFilter.IgnoreBody(map->terrainBodyID);
 			JPH::RRayCast ray(physics::joltVec3(camera->position), physics::joltVec3(camera->forward * CHARACTER_MAX_TOOL_REACH));
 			JPH::RayCastResult rayResult;
-			bool rayHit = physics::physicsSystem.GetNarrowPhaseQuery().CastRay(ray, rayResult, JPH::BroadPhaseLayerFilter(), JPH::ObjectLayerFilter(), rayFilter);
+			bool rayHit = physics::physicsSystem.GetNarrowPhaseQuery().CastRay(ray, rayResult, JPH::BroadPhaseLayerFilter(), JPH::ObjectLayerFilter(), playerToolRayFilter);
 
 			if (rayHit) {
 				glm::vec3 hitPoint = physics::glmVec3(ray.GetPointOnRay(rayResult.mFraction));
@@ -327,7 +339,37 @@ int main() {
 		}
 	});
 
-	// here i set sun uniforms, setting once for optimization since they dont change
+	// break tool usage
+	inputHandler->onMouseButtonStartPress.addListener([&](int k) -> void {
+		if (k == GLFW_MOUSE_BUTTON_LEFT && playerCurrentTool == PlayerToolStates::Break) {
+			JPH::RRayCast ray(physics::joltVec3(camera->position), physics::joltVec3(camera->forward * CHARACTER_MAX_TOOL_REACH));
+			JPH::RayCastResult rayResult;
+			bool rayHit = physics::physicsSystem.GetNarrowPhaseQuery().CastRay(ray, rayResult, JPH::BroadPhaseLayerFilter(), JPH::ObjectLayerFilter(), playerToolRayFilter);
+
+			if (rayHit) {
+				glm::vec3 hitPoint = physics::glmVec3(ray.GetPointOnRay(rayResult.mFraction));
+				JPH::BodyID hitBodyID = rayResult.mBodyID;
+				object::Object3D* hitObject = object::Object3D::getObjectFromBodyID(hitBodyID, objects3D);
+				if (hitObject == nullptr) return;
+				if (!hitObject->canBeBroken) return;
+
+				if (hitObject->hasMaterial) {
+					materialInventory[hitObject->materialType] += hitObject->materialAmount;
+				}
+
+				destroyObject(hitObject);
+			}
+		}
+	});
+
+	// player tool ray filter setup
+	{
+		playerToolRayFilter.Reserve(2);
+		playerToolRayFilter.IgnoreBody(character->bodyID);
+		playerToolRayFilter.IgnoreBody(map->terrainBodyID);
+	}
+
+	// setting sun uniforms once
 	{
 		glUniform3f(glGetUniformLocation(shaderProg3D, "sunDirection"), LIGHTING_SUN_DIRECTION.x, LIGHTING_SUN_DIRECTION.y, LIGHTING_SUN_DIRECTION.z);
 		glUniform1f(glGetUniformLocation(shaderProg3D, "sunIntensity"), LIGHTING_SUN_INTENSITY);
