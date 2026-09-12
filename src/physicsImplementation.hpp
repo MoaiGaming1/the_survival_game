@@ -11,6 +11,10 @@
 #include "Jolt/Physics/Collision/Shape/BoxShape.h"
 #include "Jolt/Physics/Body/BodyCreationSettings.h"
 #include "Jolt/Physics/Collision/Shape/HeightFieldShape.h"
+#include "Jolt/Physics/Collision/RayCast.h"
+#include "Jolt/Physics/Collision/CastResult.h"
+#include "Jolt/Physics/Body/BodyFilter.h"
+#include "Jolt/Physics/Constraints/FixedConstraint.h"
 
 #include <iostream>
 
@@ -99,6 +103,10 @@ namespace physics {
 	}
 
 	uint stepCount = 0;
+	
+	glm::vec3 glmVec3(JPH::Vec3 v) {
+		return glm::vec3(v.GetX(), v.GetY(), v.GetZ());
+	}
 
 	JPH::Vec3 joltVec3(glm::vec3 v) {
 		return JPH::Vec3(v.x, v.y, v.z);

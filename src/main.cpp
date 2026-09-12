@@ -33,6 +33,10 @@ namespace PlayerToolStates {
 	};
 };
 
+object::Object3D* weldFirstObject = nullptr;
+
+enum PlayerToolStates::PlayerToolState playerCurrentTool;
+
 void framebufferSizeCallback(GLFWwindow* win, int x, int y) {
 	glViewport(0, 0, x, y);
 }
@@ -158,7 +162,16 @@ int main() {
 		GLFW_KEY_A,
 		GLFW_KEY_S,
 		GLFW_KEY_D,
-		GLFW_KEY_L
+
+		GLFW_KEY_L,
+
+		GLFW_KEY_T,
+		GLFW_KEY_1,
+		GLFW_KEY_2,
+		GLFW_KEY_3
+	};
+	inputHandler->mouseButtonsToTrack = {
+		GLFW_MOUSE_BUTTON_LEFT
 	};
 
 	glEnable(GL_DEPTH_TEST);
@@ -168,6 +181,8 @@ int main() {
 	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glfwSwapInterval(1);
 
 	physics::init();
 
@@ -181,11 +196,36 @@ int main() {
 	character->visible = false;
 	objects3D.push_back(character);
 
+	object::Object3D* cubeA = new object::Object3D(shaderProg3D, camera);
+	cubeA->setModel("assets/models/Cube.json");
+	cubeA->position = character->position + glm::vec3(0.0f, 10.0f, 0.0f);
+	cubeA->addPhysics(object::ObjectHitboxTypes::Box, JPH::EMotionType::Dynamic);
+	cubeA->objColor = {1.0f, 1.0f, 0.0f, 1.0f};
+	objects3D.push_back(cubeA);
+
+	object::Object3D* cubeB = new object::Object3D(shaderProg3D, camera);
+	cubeB->setModel("assets/models/Cube.json");
+	cubeB->position = character->position + glm::vec3(0.0f, 10.0f, 0.0f);
+	cubeB->addPhysics(object::ObjectHitboxTypes::Box, JPH::EMotionType::Dynamic);
+	cubeB->objColor = {0.0f, 1.0f, 1.0f, 1.0f};
+	objects3D.push_back(cubeB);
+
+	mapGen::Map* map = mapGen::generateMap(shaderProg3D, camera, 10);
+	objects3D.push_back(map->terrain);
+	map->terrain->objColor = {0.0f, 1.0f, 1.0f, 1.0f};
+	for (object::Object3D* tree : map->trees) {
+		tree->objColor = {1.0f, 0.9f, 0.5f, 1.0f};
+		objects3D.push_back(tree);
+	}
+
+
 	std::cout << "starting the render loop\n";
 
 	float renderDT = 0;
 
 	bool debugFlyMode = false;
+
+	// movement
 	character->onPreUpdate.addListener([&](float dt) -> void {
 		glm::vec3 flatForward = glm::normalize(glm::vec3(camera->forward.x, 0.0f, camera->forward.z));
 		glm::vec3 flatRight = glm::normalize(glm::vec3(camera->right.x, 0.0f, camera->right.z));
@@ -205,6 +245,8 @@ int main() {
 			character->position += (camera->forward * moveDir[0] + camera->right * moveDir[1]) * CHARACTER_DEBUG_FLY_SPEED * dt;
 		}
 	});
+
+	// debug fly
 	inputHandler->onKeyStartPress.addListener([&](int k) -> void {
 		if (k == GLFW_KEY_L) {
 			//std::cout << "key pressed\n";
@@ -219,17 +261,71 @@ int main() {
 		}
 	});
 
+	// camera rotation
 	inputHandler->onMouseMovement.addListener([&](glm::vec2 delta) -> void {
 		camera->rotation += delta * CHARACTER_MOUSE_SENSITIVITY;
 	});
 
-	mapGen::Map* map = mapGen::generateMap(shaderProg3D, camera, 10);
-	objects3D.push_back(map->terrain);
-	map->terrain->objColor = {0.0f, 1.0f, 1.0f, 1.0f};
-	for (object::Object3D* tree : map->trees) {
-		tree->objColor = {1.0f, 0.9f, 0.5f, 1.0f};
-		objects3D.push_back(tree);
-	}
+	// tool changing
+	inputHandler->onKeyStartPress.addListener([&](int k) -> void {
+		if (!inputHandler->isKeyPressed(GLFW_KEY_T)) return;
+		if (k == GLFW_KEY_1) {
+			if (playerCurrentTool != PlayerToolStates::Weld) {
+				playerCurrentTool = PlayerToolStates::Weld;
+				//std::cout << "using weld\n";
+			}
+		} else if (k == GLFW_KEY_2) {
+			if (playerCurrentTool != PlayerToolStates::Break) {
+				playerCurrentTool = PlayerToolStates::Break;
+				//std::cout << "using break\n";
+			}
+		} else if (k == GLFW_KEY_3) {
+			if (playerCurrentTool != PlayerToolStates::Place) {
+				playerCurrentTool = PlayerToolStates::Place;
+				//std::cout << "using place\n";
+			}
+		}
+	});
+
+	// weld tool usage
+	inputHandler->onMouseButtonStartPress.addListener([&](int k) -> void {
+		if (k == GLFW_MOUSE_BUTTON_LEFT && playerCurrentTool == PlayerToolStates::Weld) {
+			JPH::IgnoreMultipleBodiesFilter rayFilter;
+			rayFilter.Reserve(2);
+			rayFilter.IgnoreBody(character->bodyID);
+			rayFilter.IgnoreBody(map->terrainBodyID);
+			JPH::RRayCast ray(physics::joltVec3(camera->position), physics::joltVec3(camera->forward * CHARACTER_MAX_TOOL_REACH));
+			JPH::RayCastResult rayResult;
+			bool rayHit = physics::physicsSystem.GetNarrowPhaseQuery().CastRay(ray, rayResult, JPH::BroadPhaseLayerFilter(), JPH::ObjectLayerFilter(), rayFilter);
+
+			if (rayHit) {
+				glm::vec3 hitPoint = physics::glmVec3(ray.GetPointOnRay(rayResult.mFraction));
+				JPH::BodyID hitBodyID = rayResult.mBodyID;
+				object::Object3D* hitObject = object::Object3D::getObjectFromBodyID(hitBodyID, objects3D);
+				if (hitObject == nullptr) return;
+				//std::cout << "weld hit object\n";
+
+				if (weldFirstObject == nullptr) {
+					weldFirstObject = hitObject;
+					//std::cout << "set as first object of weld\n";
+				} else {
+					if (weldFirstObject == hitObject) return;
+					//std::cout << "welding\n";
+
+					JPH::Body* bodyA = physics::physicsSystem.GetBodyLockInterface().TryGetBody(weldFirstObject->bodyID);
+  			  JPH::Body* bodyB = physics::physicsSystem.GetBodyLockInterface().TryGetBody(hitObject->bodyID);
+
+					JPH::FixedConstraintSettings weldSettings;
+					weldSettings.mAutoDetectPoint = true;
+					
+					JPH::Constraint* weld = weldSettings.Create(*bodyA, *bodyB);
+					physics::physicsSystem.AddConstraint(weld);
+
+					weldFirstObject = nullptr;
+				}
+			}
+		}
+	});
 
 	// here i set sun uniforms, setting once for optimization since they dont change
 	{

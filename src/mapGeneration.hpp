@@ -152,6 +152,9 @@ namespace mapGen {
 				physics::Layers::NON_MOVING
 			);
 
+			bSettings.mFriction = 0.5f;
+			bSettings.mRestitution = 0.0f;
+
 			JPH::Body* b = physics::physicsSystem.GetBodyInterface().CreateBody(bSettings);
 			physics::physicsSystem.GetBodyInterface().AddBody(b->GetID(), JPH::EActivation::DontActivate);
 

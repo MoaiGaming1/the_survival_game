@@ -265,5 +265,12 @@ namespace object {
 			physics::physicsSystem.GetBodyInterface().DestroyBody(bodyID);
 			hasBody = false;
 		}
+
+		static Object3D* getObjectFromBodyID(JPH::BodyID body, std::vector<Object3D*> objs) {
+			for (Object3D* obj : objs) {
+				if (obj->bodyID == body) return obj;
+			}
+			return nullptr;
+		}
 	};
 }
