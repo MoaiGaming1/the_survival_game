@@ -28,6 +28,7 @@ object::Camera* camera;
 input::InputHandler* inputHandler;
 std::unordered_map<object::MaterialTypes::MaterialType, float> materialInventory;
 JPH::IgnoreMultipleBodiesFilter playerToolRayFilter;
+object::Menu2D placeToolMenu;
 
 namespace PlayerToolStates {
 	enum PlayerToolState {
@@ -263,6 +264,9 @@ int main() {
 		materialInventory[(object::MaterialTypes::MaterialType)i] = 0.0f;
 	}
 
+	// create menus
+	placeToolMenu = object::MenuFactory::placeToolMenu(shaderProg2D);
+
 	std::cout << "starting the render loop\n";
 
 	float renderDT = 0;
@@ -307,6 +311,7 @@ int main() {
 
 	// camera rotation
 	inputHandler->onMouseMovement.addListener([&](glm::vec2 delta) -> void {
+		if (glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED) return;
 		camera->rotation += delta * CHARACTER_MOUSE_SENSITIVITY;
 	});
 
@@ -393,17 +398,7 @@ int main() {
 	// place tool usage
 	inputHandler->onMouseButtonStartPress.addListener([&](int k) -> void {
 		if (k == GLFW_MOUSE_BUTTON_RIGHT && playerCurrentTool == PlayerToolStates::Place) {
-			std::cout << "place tool menu opened\n";
-			object::Object2D* x = new object::Object2D(shaderProg2D, {
-				-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
-				0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
-				0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
-				-0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f
-			}, {
-				0, 1, 2,
-				0, 3, 2
-			});
-			objects2D.push_back(x);
+			placeToolMenu.toggle(window, objects2D);
 		}
 	});
 

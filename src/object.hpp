@@ -11,6 +11,7 @@
 #include "constants.hpp"
 
 #include <vector>
+#include <algorithm>
 
 namespace object {
 	namespace MaterialTypes {
@@ -324,4 +325,60 @@ namespace object {
 			return nullptr;
 		}
 	};
+
+	struct Menu2D {
+		std::vector<Object2D*> objects;
+
+		bool wasAdded = false;
+		bool needsMouse = false;
+
+		void toggle(GLFWwindow* win, std::vector<Object2D*>& a) {
+			if (wasAdded) {
+				removeFromArray(win, a);
+			} else {
+				addToArray(win, a);
+			}
+		}
+
+		void addToArray(GLFWwindow* win, std::vector<Object2D*>& a) {
+			for (Object2D* obj : objects) {
+				if (std::find(a.begin(), a.end(), obj) == a.end()) {
+					a.push_back(obj);
+				}
+			}
+			wasAdded = true;
+			if (needsMouse) glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		}
+
+		void removeFromArray(GLFWwindow* win, std::vector<Object2D*>& a) {
+			for (Object2D* obj : objects) {
+				auto it = std::find(a.begin(), a.end(), obj);
+				if (it != a.end()) {
+					a.erase(it);
+				}
+			}
+			wasAdded = false;
+			if (needsMouse) glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		}
+	};
+
+	namespace MenuFactory {
+		Menu2D placeToolMenu(uint shaderProg) {
+			Menu2D menu;
+			menu.needsMouse = true;
+
+			object::Object2D* x = new object::Object2D(shaderProg, {
+				-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
+				0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
+				0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
+				-0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f
+			}, {
+				0, 1, 2,
+				0, 3, 2
+			});
+			menu.objects.push_back(x);
+
+			return menu;
+		}
+	}
 }
