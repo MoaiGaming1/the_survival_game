@@ -49,7 +49,6 @@ namespace object {
 
 		glm::vec4 objColor = {0.0f, 0.0f, 0.0f, 1.0f};
 
-		uint objColorLoc;
 		uint shaderProgram;
 
 		uint dimensions = 0;
@@ -90,7 +89,7 @@ namespace object {
 
 			glBindBuffer(GL_ARRAY_BUFFER, VBO);
 			if (vertices.size() > 0) glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-			
+
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 			if (indices.size() > 0) glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(uint), indices.data(), GL_STATIC_DRAW);
 
@@ -114,8 +113,6 @@ namespace object {
 
 		Object(uint prog, std::vector<float> v = {}, std::vector<uint> i = {}) : shaderProgram(prog), vertices(v), indices(i) {
 			initVAOVBOEBO();
-
-			objColorLoc = glGetUniformLocation(shaderProgram, "objColor");
 		}
 
 		virtual ~Object() {
@@ -186,6 +183,30 @@ namespace object {
 		}
 	};
 
+	class Object2D : public Object {
+	public:
+		uint objColorLoc;
+
+		void draw() override {
+			glUseProgram(shaderProgram);
+
+			glBindVertexArray(VAO);
+
+			glUniform4fv(objColorLoc, 1, glm::value_ptr(objColor));
+
+			glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+		}
+
+		Object2D(uint prog, std::vector<float> v = {}, std::vector<uint> i = {}) : Object(prog, v, i) {
+			dimensions = 2;
+			objColorLoc = glGetUniformLocation(shaderProgram, "objColor");
+		}
+
+		~Object2D() {
+
+		}
+	};
+
 	class Object3D : public Object {
 	public:
 		glm::vec3 position = {0.0f, 0.0f, 0.0f};
@@ -193,7 +214,7 @@ namespace object {
 		glm::vec3 scale = {1.0f, 1.0f, 1.0f};
 
 		Camera* boundCamera;
-		uint mvpLoc, modelLoc, normalMatLoc;
+		uint mvpLoc, modelLoc, normalMatLoc, objColorLoc;
 
 		JPH::BodyID bodyID;
 		bool hasBody = false;
@@ -211,12 +232,12 @@ namespace object {
 
 			JPH::BodyInterface& bodyInterface = physics::physicsSystem.GetBodyInterface();
 
-      JPH::RVec3 joltPos = bodyInterface.GetPosition(bodyID);
-      position = glm::vec3(joltPos.GetX(), joltPos.GetY(), joltPos.GetZ());
+			JPH::RVec3 joltPos = bodyInterface.GetPosition(bodyID);
+			position = glm::vec3(joltPos.GetX(), joltPos.GetY(), joltPos.GetZ());
 
-      JPH::Quat joltRot = bodyInterface.GetRotation(bodyID);
-      glm::quat q(joltRot.GetW(), joltRot.GetX(), joltRot.GetY(), joltRot.GetZ());
-      rotation = glm::degrees(glm::eulerAngles(q));
+			JPH::Quat joltRot = bodyInterface.GetRotation(bodyID);
+			glm::quat q = physics::glmQuat(joltRot);
+			rotation = glm::degrees(glm::eulerAngles(q));
 		}
 
 		void draw() override {
@@ -249,6 +270,7 @@ namespace object {
 			mvpLoc = glGetUniformLocation(shaderProgram, "mvp");
 			modelLoc = glGetUniformLocation(shaderProgram, "model");
 			normalMatLoc = glGetUniformLocation(shaderProgram, "normalMatrix");
+			objColorLoc = glGetUniformLocation(shaderProgram, "objColor");
 			dimensions = 3;
 		}
 
@@ -266,7 +288,7 @@ namespace object {
 		void addPhysics(enum ObjectHitboxTypes::ObjectHitboxType hitboxType = ObjectHitboxTypes::Box, enum JPH::EMotionType motionType = JPH::EMotionType::Dynamic, JPH::Vec3 hitboxSize = JPH::Vec3(1.0f, 1.0f, 1.0f)) {
 			if (hasBody) return;
 			JPH::ShapeRefC shape;
-			
+
 			switch (hitboxType) {
 				case (ObjectHitboxTypes::Box):
 					JPH::ShapeSettings* boxShapeSettings = new JPH::BoxShapeSettings(hitboxSize);

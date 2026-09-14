@@ -116,6 +116,10 @@ namespace physics {
 		return glm::quat(glm::radians(r));
 	}
 
+	glm::quat glmQuat(JPH::Quat q) {
+		return glm::quat(q.GetW(), q.GetX(), q.GetY(), q.GetZ());
+	}
+
 	JPH::Quat joltQuat(glm::quat q) {
 		return JPH::Quat(q.x, q.y, q.z, q.w);
 	}

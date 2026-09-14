@@ -22,6 +22,7 @@
 #include "mapGeneration.hpp"
 
 std::vector<object::Object3D*> objects3D;
+std::vector<object::Object2D*> objects2D;
 std::vector<object::PointLight*> pointLights;
 object::Camera* camera;
 input::InputHandler* inputHandler;
@@ -87,14 +88,15 @@ int main() {
 		return EXIT_FAILURE;
 	}
 
-	
+
 	std::cout << "creating shaders\n";
 
-	uint shaderProg3D;
+	uint shaderProg3D, shaderProg2D;
 	uint depthMapFBO, depthMap, depthShaderProg;
 	uint numPointLightsLoc;
 	// shaders and shadows
 	{
+		// 3d
 		std::string _vertSource3D = assetBridge::readFile("assets/shaders/vert3d.vert");
 		std::string _fragSource3D = assetBridge::readFile("assets/shaders/frag3d.frag");
 
@@ -122,6 +124,31 @@ int main() {
 		glUseProgram(shaderProg3D);
 
 		numPointLightsLoc = glGetUniformLocation(shaderProg3D, "numPointLights");
+
+		// 2d
+		std::string _vertSource2D = assetBridge::readFile("assets/shaders/vert2d.vert");
+		std::string _fragSource2D = assetBridge::readFile("assets/shaders/frag2d.frag");
+
+		const char* vertSource2D = _vertSource2D.c_str();
+		const char* fragSource2D = _fragSource2D.c_str();
+
+		uint v2d = glCreateShader(GL_VERTEX_SHADER);
+		glShaderSource(v2d, 1, &vertSource2D, NULL);
+		glCompileShader(v2d);
+		checkShaderErrors(v2d, "vertex 2d");
+
+		uint f2d = glCreateShader(GL_FRAGMENT_SHADER);
+		glShaderSource(f2d, 1, &fragSource2D, NULL);
+		glCompileShader(f2d);
+		checkShaderErrors(f2d, "fragment 2d");
+
+		shaderProg2D = glCreateProgram();
+		glAttachShader(shaderProg2D, v2d);
+		glAttachShader(shaderProg2D, f2d);
+		glLinkProgram(shaderProg2D);
+
+		glDeleteShader(v2d);
+		glDeleteShader(f2d);
 
 		// shadow depth map and stuff
 		glGenFramebuffers(1, &depthMapFBO);
@@ -185,7 +212,8 @@ int main() {
 		GLFW_KEY_3
 	};
 	inputHandler->mouseButtonsToTrack = {
-		GLFW_MOUSE_BUTTON_LEFT
+		GLFW_MOUSE_BUTTON_LEFT,
+		GLFW_MOUSE_BUTTON_RIGHT
 	};
 
 	glEnable(GL_DEPTH_TEST);
@@ -329,7 +357,7 @@ int main() {
 
 					JPH::FixedConstraintSettings weldSettings;
 					weldSettings.mAutoDetectPoint = true;
-					
+
 					JPH::Constraint* weld = weldSettings.Create(*bodyA, *bodyB);
 					physics::physicsSystem.AddConstraint(weld);
 
@@ -362,6 +390,23 @@ int main() {
 		}
 	});
 
+	// place tool usage
+	inputHandler->onMouseButtonStartPress.addListener([&](int k) -> void {
+		if (k == GLFW_MOUSE_BUTTON_RIGHT && playerCurrentTool == PlayerToolStates::Place) {
+			std::cout << "place tool menu opened\n";
+			object::Object2D* x = new object::Object2D(shaderProg2D, {
+				-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
+				0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
+				0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
+				-0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f
+			}, {
+				0, 1, 2,
+				0, 3, 2
+			});
+			objects2D.push_back(x);
+		}
+	});
+
 	// player tool ray filter setup
 	{
 		playerToolRayFilter.Reserve(2);
@@ -383,7 +428,7 @@ int main() {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		inputHandler->update();
-		
+
 		camera->rotation.x = std::fmod(camera->rotation.x, 360.0f);
 		camera->rotation.y = glm::clamp(camera->rotation.y, -89.9f, 89.9f);
 		camera->position = glm::mix(camera->position, character->position, renderDT * CHARACTER_CAMERA_LERP_SPEED);
@@ -392,7 +437,7 @@ int main() {
 		glm::vec3 camMeaningfulPos = camera->position;
 
 		physics::update((float)glfwGetTime());
-		
+
 		// shadow pass
 		{
 			glm::vec3 sunDir = glm::normalize(LIGHTING_SUN_DIRECTION);
@@ -407,7 +452,7 @@ int main() {
 			glViewport(0, 0, LIGHTING_SHADOW_RES.x * LIGHTING_SHADOW_RANGE, LIGHTING_SHADOW_RES.y * LIGHTING_SHADOW_RANGE);
 			glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 			glClear(GL_DEPTH_BUFFER_BIT);
-			
+
 			glUseProgram(depthShaderProg);
 			glUniformMatrix4fv(glGetUniformLocation(depthShaderProg, "lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
 
@@ -481,10 +526,21 @@ int main() {
 
 		// render pass
 		{
+			// 3d pass
 			for (object::Object3D* obj : objects3D) {
 				if (!obj->doesUpdate) continue;
 				if (renderDT != 0) obj->onPreUpdate.broadcast(renderDT);
 				obj->syncPhysics();
+				if (obj->doesRender && obj->visible) {
+					obj->draw();
+				}
+				if (renderDT != 0) obj->onUpdate.broadcast(renderDT);
+			}
+
+			// 2d pass
+			for (object::Object2D* obj : objects2D) {
+				if (!obj->doesUpdate) continue;
+				if (renderDT != 0) obj->onPreUpdate.broadcast(renderDT);
 				if (obj->doesRender && obj->visible) {
 					obj->draw();
 				}
