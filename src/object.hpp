@@ -228,6 +228,12 @@ namespace object {
 
 		bool canBeBroken = true;
 
+		void setMaterial(enum MaterialTypes::MaterialType mat, float amount) {
+			hasMaterial = true;
+			materialAmount = amount;
+			materialType = mat;
+		}
+
 		void syncPhysics() {
 			if (!hasBody) return;
 
@@ -363,7 +369,7 @@ namespace object {
 	};
 
 	namespace MenuFactory {
-		Menu2D placeToolMenu(uint shaderProg) {
+		Menu2D placeToolMenu(GLFWwindow* win, uint shaderProg, enum MaterialTypes::MaterialType &playerMaterial) {
 			Menu2D menu; 
 			menu.needsMouse = true;
 
@@ -374,27 +380,50 @@ namespace object {
 				-0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f
 			}, {
 				0, 1, 2,
-				0, 3, 2
+				2, 3, 0
 			});
 			background->objColor = {0.0f, 0.0f, 0.0f, 0.5f};
 			menu.objects.push_back(background);
 
 			glm::vec2 materialButtonScales = {0.1f, 0.8f / (float)MaterialTypes::MATERIAL_TYPE_COUNT};
 			glm::vec2 materialButtonOffset = {-0.4, -0.4};
+			float materialButtonGap = 0.025f;
 			for (int i = 0; i < MaterialTypes::MATERIAL_TYPE_COUNT; i++) {
-				enum MaterialTypes::MaterialType mat = (MaterialTypes::MaterialType)i;
+				enum MaterialTypes::MaterialType mat = (MaterialTypes::MaterialType)(MaterialTypes::MATERIAL_TYPE_COUNT-(i+1));
 				glm::vec2 bottomLeft = {materialButtonOffset.x, materialButtonOffset.y + materialButtonScales.y * i};
+				glm::vec2 topRight = bottomLeft + materialButtonScales - glm::vec2(0.0f, materialButtonGap);
 				object::Object2D* button = new object::Object2D(shaderProg, {
 					bottomLeft.x, bottomLeft.y, 0.0f, 0.0f, 0.0f, 0.0f,
-					bottomLeft.x, bottomLeft.y + materialButtonScales.y, 0.0f, 0.0f, 0.0f, 0.0f,
-					bottomLeft.x + materialButtonScales.x, bottomLeft.y, 0.0f, 0.0f, 0.0f, 0.0f,
-					bottomLeft.x + materialButtonScales.x, bottomLeft.y + materialButtonScales.y - 0.05f, 0.0f, 0.0f, 0.0f, 0.0f
+					bottomLeft.x, topRight.y, 0.0f, 0.0f, 0.0f, 0.0f,
+					topRight.x, bottomLeft.y, 0.0f, 0.0f, 0.0f, 0.0f,
+					topRight.x, topRight.y, 0.0f, 0.0f, 0.0f, 0.0f
 				}, {
 					0, 2, 1,
 					1, 2, 3
 				});
 				button->objColor = {0.65f, 0.55f, 0.5f, 0.8f};
-				std::cout << bottomLeft.x << " " << bottomLeft.y << "\n";
+
+				enum MaterialTypes::MaterialType* playerMaterialPtr = &playerMaterial;
+				button->onPreUpdate.addListener([win, playerMaterialPtr, bottomLeft, topRight, mat, button](float dt) -> void {
+					if (!button->visible) return;
+					if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_LEFT) != GLFW_PRESS) return;
+
+					double x, y;
+					glfwGetCursorPos(win, &x, &y);
+					int w, h;
+					glfwGetFramebufferSize(win, &w, &h);
+
+					float glX = (float)((float)x / (float)w) * 2.0f - 1.0f;
+					float glY = (float)(((float)h - (float)y) / (float)h) * 2.0f - 1.0f;
+
+					bool inBounds = ((glX >= bottomLeft.x) && (glX <= topRight.x)) && ((glY >= bottomLeft.y) && (glY <= topRight.y));
+
+					if (inBounds) {
+						//std::cout << "CLICKING";
+						*playerMaterialPtr = mat;
+						//std::cout << " - new val: " << *playerMaterialPtr << "\n";
+					}
+				});
 				menu.objects.insert(menu.objects.begin(), button);
 			}
 

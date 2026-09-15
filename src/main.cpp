@@ -41,6 +41,7 @@ namespace PlayerToolStates {
 object::Object3D* weldFirstObject = nullptr;
 
 enum PlayerToolStates::PlayerToolState playerCurrentTool;
+enum object::MaterialTypes::MaterialType placeToolSelectedMaterial = (object::MaterialTypes::MaterialType)0;
 
 void destroyObject(object::Object3D* obj) {
 	auto it = std::find(objects3D.begin(), objects3D.end(), obj);
@@ -220,10 +221,12 @@ int main() {
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glEnable(GL_MULTISAMPLE);
+	glEnable(GL_CULL_FACE);
 
 	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glCullFace(GL_CCW);
 
 	glfwSwapInterval(1);
 
@@ -256,6 +259,7 @@ int main() {
 	map->terrain->objColor = {0.0f, 1.0f, 1.0f, 1.0f};
 	for (object::Object3D* tree : map->trees) {
 		tree->objColor = {1.0f, 0.9f, 0.5f, 1.0f};
+		tree->setMaterial(object::MaterialTypes::Wood, 25.0f);
 		objects3D.push_back(tree);
 	}
 
@@ -265,7 +269,7 @@ int main() {
 	}
 
 	// create menus
-	placeToolMenu = object::MenuFactory::placeToolMenu(shaderProg2D);
+	placeToolMenu = object::MenuFactory::placeToolMenu(window, shaderProg2D, placeToolSelectedMaterial);
 
 	std::cout << "starting the render loop\n";
 
@@ -397,8 +401,28 @@ int main() {
 
 	// place tool usage
 	inputHandler->onMouseButtonStartPress.addListener([&](int k) -> void {
-		if (k == GLFW_MOUSE_BUTTON_RIGHT && playerCurrentTool == PlayerToolStates::Place) {
-			placeToolMenu.toggle(window, objects2D);
+		if (playerCurrentTool == PlayerToolStates::Place) {
+			if (k == GLFW_MOUSE_BUTTON_RIGHT) {
+				placeToolMenu.toggle(window, objects2D);
+			} else if (k == GLFW_MOUSE_BUTTON_LEFT && !placeToolMenu.wasAdded) {
+				float objCost = 5.0f; // hardcoded rn, planning to make a calculation for them. TODO: add calculation to place tool object material cost
+				if (materialInventory[placeToolSelectedMaterial] < objCost) return;
+				JPH::RRayCast ray(physics::joltVec3(camera->position), physics::joltVec3(camera->forward * CHARACTER_MAX_TOOL_REACH));
+				JPH::RayCastResult rayResult;
+				bool rayHit = physics::physicsSystem.GetNarrowPhaseQuery().CastRay(ray, rayResult, JPH::BroadPhaseLayerFilter(), JPH::ObjectLayerFilter(), playerToolRayFilter);
+
+				glm::vec3 addPos = physics::glmVec3(ray.GetPointOnRay((rayHit ? rayResult.mFraction : 1.0f)));
+
+				object::Object3D* obj = new object::Object3D(shaderProg3D, camera);
+				obj->setModel("assets/models/Cube.json");
+				obj->position = addPos;
+				obj->setMaterial(placeToolSelectedMaterial, objCost);
+				obj->addPhysics();
+				objects3D.push_back(obj);
+
+				materialInventory[placeToolSelectedMaterial] -= objCost;
+				//std::cout << "done\n";
+			}
 		}
 	});
 
