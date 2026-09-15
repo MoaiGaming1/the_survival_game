@@ -364,10 +364,10 @@ namespace object {
 
 	namespace MenuFactory {
 		Menu2D placeToolMenu(uint shaderProg) {
-			Menu2D menu;
+			Menu2D menu; 
 			menu.needsMouse = true;
 
-			object::Object2D* x = new object::Object2D(shaderProg, {
+			object::Object2D* background = new object::Object2D(shaderProg, {
 				-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
 				0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
 				0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
@@ -376,7 +376,27 @@ namespace object {
 				0, 1, 2,
 				0, 3, 2
 			});
-			menu.objects.push_back(x);
+			background->objColor = {0.0f, 0.0f, 0.0f, 0.5f};
+			menu.objects.push_back(background);
+
+			glm::vec2 materialButtonScales = {0.1f, 0.8f / (float)MaterialTypes::MATERIAL_TYPE_COUNT};
+			glm::vec2 materialButtonOffset = {-0.4, -0.4};
+			for (int i = 0; i < MaterialTypes::MATERIAL_TYPE_COUNT; i++) {
+				enum MaterialTypes::MaterialType mat = (MaterialTypes::MaterialType)i;
+				glm::vec2 bottomLeft = {materialButtonOffset.x, materialButtonOffset.y + materialButtonScales.y * i};
+				object::Object2D* button = new object::Object2D(shaderProg, {
+					bottomLeft.x, bottomLeft.y, 0.0f, 0.0f, 0.0f, 0.0f,
+					bottomLeft.x, bottomLeft.y + materialButtonScales.y, 0.0f, 0.0f, 0.0f, 0.0f,
+					bottomLeft.x + materialButtonScales.x, bottomLeft.y, 0.0f, 0.0f, 0.0f, 0.0f,
+					bottomLeft.x + materialButtonScales.x, bottomLeft.y + materialButtonScales.y - 0.05f, 0.0f, 0.0f, 0.0f, 0.0f
+				}, {
+					0, 2, 1,
+					1, 2, 3
+				});
+				button->objColor = {0.65f, 0.55f, 0.5f, 0.8f};
+				std::cout << bottomLeft.x << " " << bottomLeft.y << "\n";
+				menu.objects.insert(menu.objects.begin(), button);
+			}
 
 			return menu;
 		}
