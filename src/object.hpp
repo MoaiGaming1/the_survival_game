@@ -407,6 +407,7 @@ namespace object {
 				button->onPreUpdate.addListener([win, playerMaterialPtr, bottomLeft, topRight, mat, button](float dt) -> void {
 					if (!button->visible) return;
 					if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_LEFT) != GLFW_PRESS) return;
+					if (*playerMaterialPtr == mat) return;
 
 					double x, y;
 					glfwGetCursorPos(win, &x, &y);

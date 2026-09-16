@@ -29,6 +29,7 @@ input::InputHandler* inputHandler;
 std::unordered_map<object::MaterialTypes::MaterialType, float> materialInventory;
 JPH::IgnoreMultipleBodiesFilter playerToolRayFilter;
 object::Menu2D placeToolMenu;
+object::Object3D* objectHolding = nullptr;
 
 namespace PlayerToolStates {
 	enum PlayerToolState {
@@ -211,7 +212,9 @@ int main() {
 		GLFW_KEY_T,
 		GLFW_KEY_1,
 		GLFW_KEY_2,
-		GLFW_KEY_3
+		GLFW_KEY_3,
+
+		GLFW_KEY_G
 	};
 	inputHandler->mouseButtonsToTrack = {
 		GLFW_MOUSE_BUTTON_LEFT,
@@ -424,6 +427,26 @@ int main() {
 				//std::cout << "done\n";
 			}
 		}
+	});
+
+	// grab key
+	inputHandler->onKeyStartPress.addListener([&](int k) -> void {
+		if (k != GLFW_KEY_G) return;
+		JPH::RRayCast ray(physics::joltVec3(camera->position), physics::joltVec3(camera->forward * CHARACTER_MAX_TOOL_REACH));
+		JPH::RayCastResult rayResult;
+		bool rayHit = physics::physicsSystem.GetNarrowPhaseQuery().CastRay(ray, rayResult, JPH::BroadPhaseLayerFilter(), JPH::ObjectLayerFilter(), playerToolRayFilter);
+		
+		if (rayHit) {
+			objectHolding = object::Object3D::getObjectFromBodyID(rayResult.mBodyID, objects3D);
+		} else if (objectHolding != nullptr) {
+			objectHolding = nullptr;
+		}
+	});
+	inputHandler->whileKeyHold.addListener([&](int k) -> void {
+		if (k != GLFW_KEY_G) return;
+		if (objectHolding == nullptr) return;
+		if (!objectHolding->hasBody) return;
+		physics::physicsSystem.GetBodyInterface().MoveKinematic(objectHolding->bodyID, physics::joltVec3(camera->position + camera->forward * CHARACTER_GRAB_DISTANCE), physics::joltQuat(glm::vec3(camera->rotation, 0)), renderDT * 10.0f);
 	});
 
 	// player tool ray filter setup
