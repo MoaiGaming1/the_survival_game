@@ -15,10 +15,14 @@
 #include "Jolt/Physics/Collision/CastResult.h"
 #include "Jolt/Physics/Body/BodyFilter.h"
 #include "Jolt/Physics/Constraints/FixedConstraint.h"
+#include "Jolt/Physics/Collision/ContactListener.h"
 
 #include <iostream>
+#include <vector>
+#include <unordered_map>
 
 #include "constants.hpp"
+#include "event.hpp"
 
 
 namespace physics {
@@ -81,29 +85,6 @@ namespace physics {
 	ObjectVsBroadPhaseLayerFilterImpl objVsBpFilter;
 	ObjectLayerPairFilterImpl objVsObjFilter;
 
-	void init() {
-		JPH::RegisterDefaultAllocator();
-		JPH::Factory::sInstance = new JPH::Factory();
-		JPH::RegisterTypes();
-
-		tempAllocator = new JPH::TempAllocatorImpl(10 * 1024 * 1024);
-		jobSystem = new JPH::JobSystemThreadPool(
-			JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers,
-			std::thread::hardware_concurrency() - 1
-		);
-
-		const JPH::uint maxBodies = 1024;
-		const JPH::uint numBodyMutexes = 0;
-		const JPH::uint maxBodyPairs = 1024;
-		const JPH::uint maxContactConstraints = 1024;
-
-		physicsSystem.Init(maxBodies, numBodyMutexes, maxBodyPairs, maxContactConstraints, broadPhaseLayerInterface, objVsBpFilter, objVsObjFilter);
-
-		std::cout << "physics init\n";
-	}
-
-	uint stepCount = 0;
-	
 	glm::vec3 glmVec3(JPH::Vec3 v) {
 		return glm::vec3(v.GetX(), v.GetY(), v.GetZ());
 	}
@@ -128,6 +109,54 @@ namespace physics {
 		glm::quat q = glmQuat(r);
 		return JPH::Quat(q.x, q.y, q.z, q.w);
 	}
+
+	Event<JPH::BodyID, JPH::BodyID, float, glm::vec3, glm::vec3> onDeformContact;
+
+	class ContactListener : public JPH::ContactListener {
+	public:
+		Event<JPH::BodyID, JPH::BodyID, float, glm::vec3, glm::vec3>* e;
+
+		ContactListener(Event<JPH::BodyID, JPH::BodyID, float, glm::vec3, glm::vec3>* _e) : e(_e) {
+
+		}
+
+		virtual void OnContactAdded(const JPH::Body &inBody1, const JPH::Body &inBody2, const JPH::ContactManifold &inManifold, JPH::ContactSettings &inSettings) override {
+			JPH::BodyID id1 = inBody1.GetID();
+			JPH::BodyID id2 = inBody2.GetID();
+
+			JPH::Vec3 contactPoint = inManifold.GetWorldSpaceContactPointOn1(0);
+			JPH::Vec3 contactNormal = inManifold.mWorldSpaceNormal;
+
+			JPH::Vec3 relVel = inBody1.GetLinearVelocity() - inBody2.GetLinearVelocity();
+			float intensity = std::abs(relVel.Dot(inManifold.mWorldSpaceNormal));
+
+			e->broadcast(id1, id2, intensity, glmVec3(contactPoint), glmVec3(contactNormal));
+			//std::cout << "contact - " << intensity << "\n";
+		}
+	};
+
+	void init() {
+		JPH::RegisterDefaultAllocator();
+		JPH::Factory::sInstance = new JPH::Factory();
+		JPH::RegisterTypes();
+
+		tempAllocator = new JPH::TempAllocatorImpl(10 * 1024 * 1024);
+		jobSystem = new JPH::JobSystemThreadPool(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, std::thread::hardware_concurrency() - 1);
+
+		const uint maxBodies = 1024;
+		const uint numBodyMutexes = 0;
+		const uint maxBodyPairs = 1024;
+		const uint maxContactConstraints = 1024;
+
+		physicsSystem.Init(maxBodies, numBodyMutexes, maxBodyPairs, maxContactConstraints, broadPhaseLayerInterface, objVsBpFilter, objVsObjFilter);
+
+		ContactListener* contactListener = new ContactListener(&onDeformContact);
+		physicsSystem.SetContactListener(contactListener);
+
+		std::cout << "physics init\n";
+	}
+
+	uint stepCount = 0;
 
 	void update(float totalTime) {
 		uint expectedStepCount = totalTime * PHYSICS_RATE;

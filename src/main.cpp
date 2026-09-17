@@ -241,6 +241,7 @@ int main() {
 	character->addPhysics(object::ObjectHitboxTypes::Box, JPH::EMotionType::Dynamic);
 	character->objColor = {0.7f, 0.8f, 0.9f, 1.0f};
 	character->visible = false;
+	character->deformResistance = 1000.0f;
 	objects3D.push_back(character);
 
 	object::Object3D* cubeA = new object::Object3D(shaderProg3D, camera);
@@ -449,6 +450,17 @@ int main() {
 		physics::physicsSystem.GetBodyInterface().MoveKinematic(objectHolding->bodyID, physics::joltVec3(camera->position + camera->forward * CHARACTER_GRAB_DISTANCE), physics::joltQuat(glm::vec3(camera->rotation, 0)), renderDT * 10.0f);
 	});
 
+	// impact deform mechanic
+	physics::onDeformContact.addListener([&](JPH::BodyID a, JPH::BodyID b, float intensity, glm::vec3 iP, glm::vec3 iN) -> void {
+		object::Object3D* oA = object::Object3D::getObjectFromBodyID(a, objects3D);
+		object::Object3D* oB = object::Object3D::getObjectFromBodyID(b, objects3D);
+
+		if (oA == nullptr || oB == nullptr) return;
+
+		deform::createDeformRequest(oA, iP, intensity);
+		deform::createDeformRequest(oB, iP, intensity);
+	});
+
 	// player tool ray filter setup
 	{
 		playerToolRayFilter.Reserve(2);
@@ -569,6 +581,7 @@ int main() {
 		// render pass
 		{
 			// 3d pass
+			deform::processDeformations();
 			for (object::Object3D* obj : objects3D) {
 				if (!obj->doesUpdate) continue;
 				if (renderDT != 0) obj->onPreUpdate.broadcast(renderDT);

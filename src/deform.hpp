@@ -4,12 +4,28 @@
 #include "glm.hpp"
 
 #include <vector>
+#include <functional>
 
 namespace deform {
+	struct DeformRequest {
+		object::Object3D* obj;
+		glm::vec3 point;
+		float intensity;
+
+		DeformRequest(object::Object3D* _obj, glm::vec3 _point, float _intensity) : obj(_obj), point(_point), intensity(_intensity) {
+
+		}
+	};
+	std::vector<DeformRequest*> deformRequests;
+
 	std::vector<float> deformMath(std::vector<float> vertices, glm::vec3 pos, glm::vec3 point, float intensity, float resist, float epsilon = 0.0001f) {
 		std::vector<float> newVertices;
 		std::vector<glm::vec3> vVec;
 
+		//for (float v : vertices) std::cout << v << std::endl;
+
+		if (vertices.empty() || vertices.size() % 3 != 0) return vertices;
+		
 		vVec.resize(vertices.size() / 3);
 		newVertices.resize(vertices.size());
 		
@@ -44,7 +60,20 @@ namespace deform {
 
 	void deformPoint(object::Object3D* obj, glm::vec3 point, float intensity) {
 		std::vector<float> nV = deformMath(obj->getPureVertices(), obj->position, point, intensity, obj->deformResistance);
+		//for (float v : nV) std::cout << v << std::endl;
 		obj->setPureVertices(nV);
 		obj->updateVAOVBOEBO();
+	}
+
+	void processDeformations() {
+		for (DeformRequest* req : deformRequests) {
+			deformPoint(req->obj, req->point, req->intensity);
+			delete req;
+		}
+		deformRequests.clear();
+	}
+
+	void createDeformRequest(object::Object3D* obj, glm::vec3 point, float intensity) {
+		deformRequests.push_back(new DeformRequest(obj, point, intensity));
 	}
 }

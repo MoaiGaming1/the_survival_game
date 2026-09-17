@@ -220,7 +220,7 @@ namespace object {
 		JPH::BodyID bodyID;
 		bool hasBody = false;
 
-		float deformResistance = 1;
+		float deformResistance = 35.0f;
 
 		bool hasMaterial = false;
 		enum MaterialTypes::MaterialType materialType;
