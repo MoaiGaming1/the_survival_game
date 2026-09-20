@@ -125,7 +125,6 @@ namespace mapGen {
 						tree->setModel("assets/models/Tree.json");
 						tree->position = {x, heightmap[glm::floor(z/TERRAIN_GRID_SIZE)*TERRAIN_GRID_COUNT + glm::floor(x/TERRAIN_GRID_SIZE)]-1, z};
 						trees.push_back(tree);
-						tree->addPhysics(object::ObjectHitboxTypes::Box, JPH::EMotionType::Static, {3.5f, 30.0f, 3.5f}); // TODO: add cylinder shape and change tree physics shape to cylinder
 					}
 				}
 			}

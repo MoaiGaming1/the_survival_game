@@ -258,10 +258,12 @@ int main() {
 	cubeB->objColor = {0.0f, 1.0f, 1.0f, 1.0f};
 	objects3D.push_back(cubeB);
 
+	// map gen
 	mapGen::Map* map = mapGen::generateMap(shaderProg3D, camera, 10);
 	objects3D.push_back(map->terrain);
 	map->terrain->objColor = {0.0f, 1.0f, 1.0f, 1.0f};
 	for (object::Object3D* tree : map->trees) {
+		tree->addPhysics(object::ObjectHitboxTypes::Box, JPH::EMotionType::Static, {1.85f, 30.0f, 1.85f}); // TODO: add cylinder shape and change tree physics shape to cylinder
 		tree->objColor = {1.0f, 0.9f, 0.5f, 1.0f};
 		tree->setMaterial(object::MaterialTypes::Wood, 25.0f);
 		objects3D.push_back(tree);
@@ -447,18 +449,34 @@ int main() {
 		if (k != GLFW_KEY_G) return;
 		if (objectHolding == nullptr) return;
 		if (!objectHolding->hasBody) return;
-		physics::physicsSystem.GetBodyInterface().MoveKinematic(objectHolding->bodyID, physics::joltVec3(camera->position + camera->forward * CHARACTER_GRAB_DISTANCE), physics::joltQuat(glm::vec3(camera->rotation, 0)), renderDT * 10.0f);
+		if (physics::physicsSystem.GetBodyInterface().GetMotionType(objectHolding->bodyID) == JPH::EMotionType::Static) return;
+		physics::physicsSystem.GetBodyInterface().MoveKinematic(objectHolding->bodyID, physics::joltVec3(camera->position + camera->forward * CHARACTER_GRAB_DISTANCE), physics::joltQuat(character->rotation), renderDT * CHARACTER_GRAB_SLOWNESS);
 	});
 
 	// impact deform mechanic
+	std::unordered_map<object::Object*, float> deformTimes;
 	physics::onDeformContact.addListener([&](JPH::BodyID a, JPH::BodyID b, float intensity, glm::vec3 iP, glm::vec3 iN) -> void {
+		//if (intensity > 12.5f) std::cout << intensity << std::endl;
 		object::Object3D* oA = object::Object3D::getObjectFromBodyID(a, objects3D);
 		object::Object3D* oB = object::Object3D::getObjectFromBodyID(b, objects3D);
 
+		if (a == map->terrainBodyID) oA = map->terrain;
+		if (b == map->terrainBodyID) oB = map->terrain;
+
 		if (oA == nullptr || oB == nullptr) return;
+
+		float time = (float)glfwGetTime();
+
+		if (time - deformTimes[oA] < DEFORMATION_COOLDOWN || time - deformTimes[oB] < DEFORMATION_COOLDOWN) return;
+
+		//std::cout << oA->objColor.r << " " << oA->objColor.g << " " << oA->objColor.b << std::endl;
+		//std::cout << oB->objColor.r << " " << oB->objColor.g << " " << oB->objColor.b << std::endl;
 
 		deform::createDeformRequest(oA, iP, intensity);
 		deform::createDeformRequest(oB, iP, intensity);
+
+		deformTimes[oA] = time;
+		deformTimes[oB] = time;
 	});
 
 	// player tool ray filter setup
